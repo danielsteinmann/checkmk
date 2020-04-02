@@ -41,11 +41,25 @@ def parse_ibm_mq_channels(info):
 
 
 def inventory_ibm_mq_channels(parsed):
+    node, parsed = parsed[0]
     for service_name in parsed:
         if ':' not in service_name:
             # Do not show queue manager entry in inventory
             continue
         yield service_name, {}
+
+
+def check_ibm_mq_channels_per_node(item, params, parsed_per_node):
+    aggregate = []
+    for node, parsed in parsed_per_node:
+        try:
+            checks = list(check_ibm_mq_channels(item, params, parsed))
+            worst_status = max([c[0] for c in checks])
+            aggregate.append((worst_status, checks))
+        except MKCounterWrapped:
+            pass
+    result = min(aggregate)[1]
+    return result
 
 
 #
@@ -68,10 +82,11 @@ def check_ibm_mq_channels(item, params, parsed):
 
 check_info["ibm_mq_channels"] = {
     "parse_function": parse_ibm_mq_channels,
-    "check_function": check_ibm_mq_channels,
+    "check_function": check_ibm_mq_channels_per_node,
     "inventory_function": inventory_ibm_mq_channels,
     "service_description": "IBM MQ Channel %s",
     "has_perfdata": False,
+    "node_info": True,
     "default_levels_variable": "ibm_mq_channels_default_levels",
     "group": "ibm_mq_channels",
     "includes": ["ibm_mq.include"],

@@ -43,11 +43,25 @@ def parse_ibm_mq_queues(info):
 
 
 def inventory_ibm_mq_queues(parsed):
+    node, parsed = parsed[0]
     for service_name in parsed:
         if ':' not in service_name:
             # Do not show queue manager entry in inventory
             continue
         yield service_name, {}
+
+
+def check_ibm_mq_queues_per_node(item, params, parsed_per_node):
+    aggregate = []
+    for node, parsed in parsed_per_node:
+        try:
+            checks = list(check_ibm_mq_queues(item, params, parsed))
+            worst_status = max([c[0] for c in checks])
+            aggregate.append((worst_status, checks))
+        except MKCounterWrapped:
+            pass
+    result = min(aggregate)[1]
+    return result
 
 
 def check_ibm_mq_queues(item, params, parsed):
@@ -173,7 +187,7 @@ def ibm_mq_procs(cnt, label, levels_key, metric, params):
 check_info["ibm_mq_queues"] = {
     "parse_function": parse_ibm_mq_queues,
     "inventory_function": inventory_ibm_mq_queues,
-    "check_function": check_ibm_mq_queues,
+    "check_function": check_ibm_mq_queues_per_node,
     "service_description": "IBM MQ Queue %s",
     "has_perfdata": True,
     "default_levels_variable": "ibm_mq_queues_default_levels",

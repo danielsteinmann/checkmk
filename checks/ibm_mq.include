@@ -4,6 +4,7 @@
 # This file is part of Checkmk (https://checkmk.com). It is subject to the terms and
 # conditions defined in the file COPYING, which is part of this source code package.
 
+from collections import defaultdict
 
 def parse_runmqsc_display_output(info, group_by_object):
     re_intro = regex(r"^QMNAME\((.*)\)[\s]*STATUS\((.*?)\)[\s]*NOW\((.*)\)")
@@ -38,9 +39,9 @@ def parse_runmqsc_display_output(info, group_by_object):
             last = val
         yield last, False
 
-    parsed = {}
+    per_node = defaultdict(dict)
     attributes = {}
-    for (line,), has_more in lookahead(info):
+    for (node, line), has_more in lookahead(info):
         intro_line = re_intro.match(line)
         if intro_line:
             if attributes:
@@ -49,6 +50,7 @@ def parse_runmqsc_display_output(info, group_by_object):
             qmname = intro_line.group(1)
             qmstatus = intro_line.group(2)
             now = intro_line.group(3)
+            parsed = per_node[node]
             parsed[qmname] = {'STATUS': qmstatus, 'NOW': now}
             continue
         if re_group.match(line) or not has_more:
@@ -64,7 +66,7 @@ def parse_runmqsc_display_output(info, group_by_object):
                 record_attribute(second_half, attributes, parsed)
             else:
                 record_attribute(line, attributes, parsed)
-    return parsed
+    return per_node.items()
 
 
 def is_ibm_mq_service_vanished(item, parsed):

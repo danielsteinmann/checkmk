@@ -6,6 +6,7 @@
 
 
 def inv_ibm_mq_queues(parsed, inventory_tree, status_data_tree):
+    node, parsed = parsed[0]
     path = "software.applications.ibm_mq.queues:"
     inv_node = inventory_tree.get_list(path)
     for item in sorted(parsed):

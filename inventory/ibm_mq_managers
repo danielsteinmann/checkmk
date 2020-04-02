@@ -6,6 +6,7 @@
 
 
 def inv_ibm_mq_managers(parsed, inventory_tree, status_data_tree):
+    node, parsed = parsed[0]
     path = "software.applications.ibm_mq.managers:"
     inv_node = inventory_tree.get_list(path)
     status_node = status_data_tree.get_list(path)

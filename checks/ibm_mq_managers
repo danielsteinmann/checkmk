@@ -42,35 +42,46 @@ factory_settings["ibm_mq_managers_default_levels"] = {
 
 def parse_ibm_mq_managers(info):
     re_attributes = regex(r"[()]")
-
-    def get_data_of_line(line):
+    per_node = defaultdict(dict)
+    qmname = None
+    for node, line in info:
         splits = re_attributes.split(line)
         data = {}
         for key, value in zip(splits[::2], splits[1::2]):
             data[key.strip()] = value.strip()
-        return data
-
-    parsed = {}
-    qmname = None
-    for line in info:
-        line = line[0]
-        data = get_data_of_line(line)
+        parsed = per_node[node]
         if "QMNAME" in data:
             qmname = data["QMNAME"]
             parsed[qmname] = data
         elif "INSTANCE" in data:
             instances = parsed[qmname].setdefault("INSTANCES", [])
             instances.append((data["INSTANCE"], data["MODE"]))
-    return parsed
+    return per_node.items()
 
 
 def inventory_ibm_mq_managers(parsed):
+    node, parsed = parsed[0]
     for item in parsed:
         yield item, {}
 
 
-@get_parsed_item_data
-def check_ibm_mq_managers(item, params, data):
+def check_ibm_mq_managers_per_node(item, params, parsed_per_node):
+    aggregate = []
+    for node, parsed in parsed_per_node:
+        try:
+            checks = list(check_ibm_mq_managers(item, params, parsed))
+            sum_status = sum([c[0] for c in checks])
+            aggregate.append((sum_status, checks))
+        except MKCounterWrapped:
+            pass
+    result = min(aggregate)[1]
+    return result
+
+
+def check_ibm_mq_managers(item, params, parsed):
+    if item not in parsed or not parsed[item]:
+        return
+    data = parsed[item]
     status = data["STATUS"]
     default = data["DEFAULT"]
     instname = data["INSTNAME"]
@@ -107,9 +118,10 @@ def check_ibm_mq_managers(item, params, data):
 
 check_info['ibm_mq_managers'] = {
     "parse_function": parse_ibm_mq_managers,
-    'check_function': check_ibm_mq_managers,
+    'check_function': check_ibm_mq_managers_per_node,
     'inventory_function': inventory_ibm_mq_managers,
     'service_description': 'IBM MQ Manager %s',
+    'node_info': True,
     "default_levels_variable": "ibm_mq_managers_default_levels",
     'group': 'ibm_mq_managers',
     'includes': ['ibm_mq.include'],
